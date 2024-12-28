@@ -37,8 +37,8 @@ library(car)
 
 ## Importing the cleaned dataset
 ```{r}
-dataset_s1 = read.csv("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/dataset_s1_cleaned.csv")
-dataset_before_cleaning_s1 = read_xlsx("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/S1 File.xlsx")
+dataset_s1 = read.csv("dataset_s1_cleaned.csv")
+dataset_before_cleaning_s1 = read_xlsx("S1 File.xlsx")
 ```
 
 ## Checking for Null values
@@ -295,7 +295,7 @@ str(dataset_before_cleaning_s1)
 
 
 ```{r}
-crime_data = read.csv("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/dataset_s1_cleaned2.csv")
+crime_data = read.csv("dataset_s1_cleaned2.csv")
 head(crime_data)
 str(crime_data)
 crime_data$The.number.of.crime.incidents <- as.numeric(crime_data$The.number.of.crime.incidents)
