@@ -1,0 +1,448 @@
+---
+title: "AIT664 Project"
+author: "Jason Rayen"
+date: "2024-03-18"
+output:
+  html_document:
+    df_print: paged
+---
+
+##Importing Libraries
+```{r}
+library(dplyr)
+library(shiny)
+library(tidyr)
+library(tidyverse)
+library(leaps)
+library(knitr)
+library(ggplot2)
+library("reshape2")
+library(caret)
+library(class)
+library(psych)
+library(tree)
+library(rpart)
+library(rattle)
+library(randomForest)
+library(readxl)
+library(moments)
+library(FactoMineR)
+library(glmnet)
+library(corrplot)
+library(rsample)
+library(gridExtra)
+library(car)
+```
+
+
+## Importing the cleaned dataset
+```{r}
+dataset_s1 = read.csv("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/dataset_s1_cleaned.csv")
+dataset_before_cleaning_s1 = read_xlsx("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/S1 File.xlsx")
+```
+
+## Checking for Null values
+```{r}
+table(is.na(dataset_s1))
+```
+
+No Null values
+
+```{r}
+#Removing 2 values that are preventing The.number.of.crime.incidents from being a number
+dataset_s1$The.number.of.crime.incidents = ifelse(dataset_s1$The.number.of.crime.incidents == '-', NA, dataset_s1$The.number.of.crime.incidents)
+dataset_s1 = na.omit(dataset_s1)
+dataset_s1$The.number.of.crime.incidents = as.numeric(dataset_s1$The.number.of.crime.incidents)
+
+dataset_s1 <- mutate_all(dataset_s1, as.numeric)
+
+dataset_before_cleaning_s1$`The number of crime incidents` = 
+  ifelse(dataset_before_cleaning_s1$`The number of crime incidents` == '-', NA,
+         dataset_before_cleaning_s1$`The number of crime incidents`)
+dataset_before_cleaning_s1 = na.omit(dataset_before_cleaning_s1)
+dataset_before_cleaning_s1$`The number of crime incidents` = as.numeric(dataset_before_cleaning_s1$`The number of crime incidents`)
+```
+
+## Structure of the dataset
+```{r}
+str(dataset_s1)
+#We have one character. Converting to number
+```
+
+
+
+# Statistical and Exploratory Data Analysis
+```{r}
+dataset_s1_copy = dataset_before_cleaning_s1
+summary(dataset_s1)
+#This will give us certain information if we need scaling or not
+```
+
+From the summary statistics, we can observe some abnormal distributions in most of the variables which will play a major role during the fit of the model. These have to be avoided by normalization and generalization methods before fitting the model. This process will be done before fitting the model.
+
+#EXPLORATORY DATA ANALYSIS
+## Distribution of crime occurences
+```{r}
+ggplot(dataset_s1_copy,aes(x=`The number of crime incidents`)) +
+  geom_histogram(aes(y = ..density..), binwidth = 70, fill="cornsilk",color="black") +
+  geom_density(adjust=.8, fill="cyan",color="black", alpha=0.4) + 
+  labs(x="Crime Occurences",
+       y="Density",
+       title="Number of Crime Occurences Distribution")
+```
+
+We have a lot of crime occurrences occurring in the range of 0 to 1000. The separation for EDA purpose will be done based on that.
+
+## Catgeorizing the crime occurences into several categorizes for visualization purposes
+```{r}
+dataset_s1_copy$crime_categories <- ifelse(dataset_s1_copy$`The number of crime incidents` <= 200, 'Less number of crimes (<200)', 
+                                          ifelse(dataset_s1_copy$`The number of crime incidents` > 200 &
+                                            dataset_s1_copy$`The number of crime incidents` <= 500, '200 to 500 crime rate', 
+                                          ifelse(dataset_s1_copy$`The number of crime incidents` > 500 &
+                                            dataset_s1_copy$`The number of crime incidents` < 800, '500 to 800 crime rate', 
+                                          'High Crime Rate')))
+
+table(dataset_s1_copy$crime_categories)
+```
+
+
+# Checking Distribution of some important variables to check how it affects
+## Distribution of different races
+## White people
+```{r}
+average_white <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_white = mean(White, na.rm = TRUE))
+
+ggplot(average_white, aes(x = crime_categories, y = average_white, fill = crime_categories)) +
+  geom_bar(stat = 'identity', color = 'black') +
+  labs(
+    title = 'Average White People - Crime Occurrences',
+    x = 'Crime Rates',
+    y = 'Average White People',
+    fill = "Crime Categories"
+  ) + 
+  scale_fill_manual(
+    values = c('#66FFFF','#FF0033','#FFCC00','#0066CC')
+    )
+```
+
+A census containing around 800 white people are said to do a higher crime rate. Higher number of white people are most probably said to make less number of crimes.
+
+
+## Black or African American
+```{r}
+average_white <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_Black.or.African.American = mean(`Black or African American`, na.rm = TRUE))
+
+ggplot(average_white, aes(x = crime_categories, y = average_Black.or.African.American, fill = crime_categories)) +
+  geom_bar(stat = 'identity', color = 'black') +
+  labs(
+    title = 'Average Black.or.African.American People - Crime Occurrences',
+    x = 'Crime Rates',
+    y = 'Average Black African American People',
+    fill = "Crime Categories"
+  ) + 
+  scale_fill_manual(
+    values = c('#66FFFF','#FF0033','#FFCC00','#0066CC')
+    )
+```
+average_Black.or.African.American people are said to make most crimes. The crime rate is very high here averaging around 3000 crime rates and being the highest.
+
+## American.Indian.or.Alaska.Native
+```{r}
+average_white <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_American.Indian.or.Alaska.Native = mean(`American Indian or Alaska Native`, na.rm = TRUE))
+
+ggplot(average_white, aes(x = crime_categories, y = average_American.Indian.or.Alaska.Native, fill = crime_categories)) +
+  geom_bar(stat = 'identity', color = 'black') +
+  labs(
+    title = 'Average American.Indian.or.Alaska.Native People - Crime Occurrences',
+    x = 'Crime Rates',
+    y = 'Average American.Indian.or.Alaska.Nativen People',
+    fill = "Crime Categories"
+  ) + 
+  scale_fill_manual(
+    values = c('#66FFFF','#FF0033','#FFCC00','#0066CC')
+    )
+```
+On an average 10 people from American Indian or Alaska Native per census are to perform high crimes.
+
+## Asian
+```{r}
+average_white <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_Asian = mean(Asian, na.rm = TRUE))
+
+ggplot(average_white, aes(x = crime_categories, y = average_Asian, fill = crime_categories)) +
+  geom_bar(stat = 'identity', color = 'black') +
+  labs(
+    title = 'Average Asian People - Crime Occurrences',
+    x = 'Crime Rates',
+    y = 'Average Asian People',
+    fill = "Crime Categories"
+  ) + 
+  scale_fill_manual(
+    values = c('#66FFFF','#FF0033','#FFCC00','#0066CC')
+    )
+```
+
+Asian people are expected to make less than 200 crimes on an average. Around 200 people per census make arround 200 crimes or less. 170 people approximately make high number of crimes.
+
+## Native Hawaiian and Other Pacific Islander Race
+```{r}
+average_white <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_Native.Hawaiian.and.Other.Pacific.Islander = mean(`Native Hawaiian and Other Pacific Islander`, na.rm = TRUE))
+
+ggplot(average_white, aes(x = crime_categories, y = average_Native.Hawaiian.and.Other.Pacific.Islander, fill = crime_categories)) +
+  geom_bar(stat = 'identity', color = 'black') +
+  labs(
+    title = 'Average Hawaii People - Crime Occurrences',
+    x = 'Crime Rates',
+    y = 'Average Hawaii People',
+    fill = "Crime Categories"
+  ) + 
+  scale_fill_manual(
+    values = c('#66FFFF','#FF0033','#FFCC00','#0066CC')
+    )
+```
+On an average 2 hawaii people per census are to make higher crimes which is far far less.
+
+## How does population affect the Crime Rates - Male vs Female
+```{r}
+#Male
+average_male <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_male = mean(`Male population`, na.rm = TRUE))
+
+
+plot_male <- ggplot(average_male, aes(x = "", y = average_male, fill = crime_categories)) +
+  geom_bar(stat = "identity", width = 1) +
+  geom_text(aes(label = round(average_male,2)), position = position_stack(vjust = 0.5)) +
+  coord_polar("y", start = 0) +
+  theme(legend.position = "bottom") +
+  labs(title = "Average Male Population - Crimes", fill = "Crime Rate", y = NULL)
+
+average_female <- dataset_s1_copy %>%
+  group_by(crime_categories) %>%
+  summarize(average_female = mean(`Female population`, na.rm = TRUE))
+
+# Create plot for Female
+plot_female <- ggplot(average_female, aes(x = "", y = average_female, fill = crime_categories)) +
+  geom_bar(stat = "identity", width = 1) +
+  geom_text(aes(label = round(average_female, 2)), position = position_stack(vjust = 0.5)) +
+  coord_polar("y", start = 0) +
+  theme(legend.position = "bottom") +
+  labs(title = "Average Female Population - Crimes", fill = "Crime Rate", y = NULL)
+
+# Combine the plots
+grid.arrange(plot_male, plot_female, ncol = 2)
+```
+
+Average of 2580 females have caused high crimes and average of 2300 males have caused high crimes per census.
+
+## Does Employment have an effect ?
+```{r}
+#Visualization - Density Chart - Employed Population
+employed_population <- ggplot(dataset_s1_copy, aes(x = `Employed population`, fill = crime_categories)) +
+  geom_density(alpha = 0.3) +
+  labs(title = "Density plot for Employed Population", x = "Employed Population", y = "Density") +
+  scale_fill_manual(values = c("red", "blue", "green", "orange"))
+
+unemployed_population <- ggplot(dataset_s1_copy, aes(x = `Unemployed population`, fill = crime_categories)) +
+  geom_density(alpha = 0.3) +
+  labs(title = "Density plot for UnEmployed Population", x = "UnEmployed Population", y = "Density") +
+  scale_fill_manual(values = c("red", "blue", "green", "orange"))
+
+grid.arrange(employed_population, unemployed_population, ncol = 1)
+```
+We see higher crime rates in Unemployed Population as the population increases. 
+For Employed Population, The crime rate is less.
+
+Unemployed people are more to cause crimes compared to the employed ones.
+
+
+
+## PREDICTIVE MODELING
+##Skewness Check
+```{r}
+#Computing the skewness for All Numerical Variables
+skewness_df = data.frame(Variable_Name = character(), skewness = numeric(), stringsAsFactors =
+                           FALSE)
+for(i in names(dataset_s1)){
+  if(is.numeric(dataset_s1[[i]])){
+    value = skewness(dataset_s1[[i]], na.rm=TRUE)
+    skewness_df = rbind(skewness_df, data.frame(Variable_Name = i, skewness = value,
+                                              stringsAsFactors = FALSE))
+  }
+
+}
+skewness_df
+
+## Getting the number of variables having heavy skewness
+heavy_skewness = skewness_df[skewness_df$skewness >= 3 | skewness_df$skewness <= -2, ]
+heavy_skewness
+```
+
+## Checking the structure
+```{r}
+dataset_before_cleaning_s1[] <- lapply(dataset_before_cleaning_s1, function(x) ifelse(is.character(x), as.numeric(x), x))
+str(dataset_before_cleaning_s1)
+```
+
+
+```{r}
+crime_data = read.csv("/Users/jasonrayen/Downloads/Jason Masters/Sem 3/AIT 664 (Information, Visualization & Representation)/Project/dataset_s1_cleaned2.csv")
+head(crime_data)
+str(crime_data)
+crime_data$The.number.of.crime.incidents <- as.numeric(crime_data$The.number.of.crime.incidents)
+print(which(is.na(crime_data$The.number.of.crime.incidents)))
+crime_data <- crime_data[!is.na(crime_data$The.number.of.crime.incidents), ]
+str(crime_data)
+
+```
+
+
+```{r}
+#importing libraries
+library(ggplot2)
+library(dplyr)
+library(plotly)
+```
+
+
+```{r}
+data <- crime_data
+data <- mutate(data,
+               Percent.of.less.than.high.school = rowSums(select(data, starts_with("Percent.of.less.than.9th.grade"), "Percent.of.9th.to.12th.grade")) / data$Total.population * 100,
+               Percent.of.high.school.graduate.or.higher = rowSums(select(data, starts_with("Percent.of.high.school.graduate"), ends_with("Percent.of.graduate.or.professional.degree"))) / data$Total.population * 100
+               )
+
+```
+
+
+```{r}
+library(ggplot2)
+library(plotly)
+
+# Combine all education columns into a single dataframe
+education_data <- data.frame(
+  Less_than_9th = crime_data$Percent.of.less.than.9th.grade,
+  Grade_9th_to_12th = crime_data$Percent.of.9th.to.12th.grade,
+  High_school_graduate = crime_data$Percent.of.high.school.graduate,
+  Some_college = crime_data$Percent.of.some.college,
+  Associate_degree = crime_data$Percent.of.associate.s.degree,
+  Bachelor_degree = crime_data$Percent.of.bachelor.s.degree,
+  Graduate_professional_degree = crime_data$Percent.of.graduate.or.professional.degree,
+  Crime_incidents = crime_data$The.number.of.crime.incidents
+)
+
+# Filter data for points below 2000 on the y-axis
+filtered_data <- subset(education_data, Crime_incidents < 2000)
+
+# Reshape data for ggplot
+education_data_long <- tidyr::pivot_longer(filtered_data,
+                                           cols = -Crime_incidents,
+                                           names_to = "Education_column",
+                                           values_to = "Percent")
+
+# Define the order of education columns
+education_order <- c("Less_than_9th", "Grade_9th_to_12th", "High_school_graduate", 
+                     "Some_college", "Associate_degree", "Bachelor_degree", 
+                     "Graduate_professional_degree")
+
+# Convert Education_column to factor with defined order
+education_data_long$Education_column <- factor(education_data_long$Education_column, levels = education_order)
+
+# Plot using ggplot
+p <- ggplot(education_data_long, aes(x = Percent, y = Crime_incidents, color = Education_column)) +
+  geom_point(size = 0.5) +  
+  labs(x = "Percent of Education Level",
+       y = "Number of Crime Incidents",
+       title = "Crime Incidents vs Education Level") +
+  theme_light()  
+
+# Convert ggplot to plotly
+plotly_plot <- ggplotly(p)
+
+# Show the interactive plot
+plotly_plot
+
+```
+
+
+```{r}
+library(dplyr)
+library(plotly)
+
+# Create bins for median age
+crime_data <- mutate(crime_data,
+                     age_bin = case_when(
+                       Median.age >= 20 & Median.age < 30 ~ "20-30",
+                       Median.age >= 30 & Median.age < 40 ~ "30-40",
+                       Median.age >= 40 & Median.age < 50 ~ "40-50",
+                       Median.age >= 50 & Median.age < 60 ~ "50-60",
+                       TRUE ~ "Other"
+                     ))
+
+# Group by age bins and count the number of crime incidents
+crime_counts <- crime_data %>%
+  group_by(age_bin) %>%
+  summarize(crime_count = sum(The.number.of.crime.incidents))
+
+# Create an interactive bar plot with Plotly
+plot_ly(crime_counts, x = ~age_bin, y = ~crime_count, type = "bar") %>%
+  layout(title = "Crime Incidents by Age",
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Count of Crime Incidents"))
+
+```
+
+
+```{r}
+crime_data$Housing_Level <- cut(crime_data$Median.housing.value, breaks = 3, labels = c("Low", "Medium", "High"))
+p <- ggplot(crime_data, aes(x = Housing_Level, y = The.number.of.crime.incidents, fill = Housing_Level)) +
+  geom_boxplot() +
+  labs(x = "Housing Value",
+       y = "Crime Incidents Level",
+       title = "Relationship Between Housing Value and Crime Incidents") +
+  scale_fill_manual(values = c("Low" = "lightblue", "Medium" = "lightgreen", "High" = "lightcoral")) +
+  theme_minimal()
+```
+
+```{r}
+# Calculate the 1st and 3rd quartiles
+q1 <- quantile(crime_data$The.number.of.crime.incidents, probs = 0.25)
+q3 <- quantile(crime_data$The.number.of.crime.incidents, probs = 0.75)
+
+# Calculate the interquartile range (IQR)
+iqr <- q3 - q1
+
+# Set the upper and lower bounds for outliers
+upper_bound <- q3 + 1.5 * iqr
+lower_bound <- q1 - 1.5 * iqr
+
+# Create a filtered version of the data without outliers
+filtered_data <- subset(crime_data, The.number.of.crime.incidents >= lower_bound & The.number.of.crime.incidents <= upper_bound)
+
+# Create a boxplot with the filtered data
+p <- ggplot(filtered_data, aes(x = Housing_Level, y = The.number.of.crime.incidents, fill = Housing_Level)) +
+  geom_boxplot() +
+  labs(x = "Housing Value",
+       y = "Crime Incidents Level",
+       title = "Relationship Between Housing Value and Crime Incidents") +
+  scale_fill_manual(values = c("Low" = "lightblue", "Medium" = "lightgreen", "High" = "lightcoral")) +
+  theme_minimal()
+
+# Show the plot
+print(p)
+
+
+
+
+```
+
+
